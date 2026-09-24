@@ -1,2 +1,1 @@
-print("Nova Test: Script is working!")
-game.Players.LocalPlayer:Chat("Hello, script is active!")
+    repeat task.wait() until game:IsLoaded()

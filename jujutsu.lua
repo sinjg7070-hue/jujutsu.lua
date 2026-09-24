@@ -1,4 +1,4 @@
--- jujutsu.lua 통합 스크립트 (No-Delay 타겟팅 포함)
+-- jujutsu.lua 통합 스크립트 (거리 유지 + 회피 모드)
 repeat task.wait() until game:IsLoaded()
 
 local Players = game:GetService("Players")
@@ -34,13 +34,13 @@ end)
 local targeting = false
 local targetLoop = nil
 
--- B 키 타겟팅 (노 딜레이)
+-- B 키 타겟팅 (거리 유지 및 회피 로직)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.B then
         targeting = not targeting
         if targeting then
-            Label.Text = "Targeting: ON (No Delay)"
+            Label.Text = "Targeting: ON (Evasion Mode)"
             targetLoop = RunService.Heartbeat:Connect(function()
                 local char = LocalPlayer.Character
                 if char and char:FindFirstChild("HumanoidRootPart") then
@@ -51,9 +51,15 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                             if d < dist then dist = d; closest = p end
                         end
                     end
+                    
                     if closest then
-                        -- 즉시 이동
-                        char.HumanoidRootPart.CFrame = closest.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+                        -- [핵심] 상대와 10스터드(Studs) 거리를 유지하며 상대를 바라봄
+                        -- Y축(높이)은 상대와 비슷하게 유지하여 공격이 빗나가지 않게 함
+                        local targetPos = closest.Character.HumanoidRootPart.CFrame
+                        char.HumanoidRootPart.CFrame = targetPos * CFrame.new(0, 0, 10) -- 여기서 10을 조절하면 거리가 변함
+                        
+                        -- 공격을 위한 바라보기
+                        char.HumanoidRootPart.CFrame = CFrame.lookAt(char.HumanoidRootPart.Position, targetPos.Position)
                     end
                 end
             end)
@@ -61,16 +67,5 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             Label.Text = "Targeting: OFF"
             if targetLoop then targetLoop:Disconnect() end
         end
-    end
-end)
-
--- 채팅 명령어 처리 (간략화)
-LocalPlayer.Chatted:Connect(function(msg)
-    if msg == ";fly" then
-        Label.Text = "Command: Fly Enabled"
-        -- 비행 로직 추가 영역
-    elseif msg == ";gojo kill farm" then
-        Label.Text = "Command: Kill Farm Active"
-        -- 파밍 로직 추가 영역
     end
 end)

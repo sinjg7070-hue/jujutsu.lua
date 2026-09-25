@@ -1,160 +1,77 @@
--- ========================================
--- 서버 플레이어 순환 텔레포트 스크립트 (오픈소스)
--- 기능: V 키로 토글, 0.2초마다 다음 플레이어의 뒤쪽 0.5칸으로 텔레포트
--- ========================================
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
--- ========================================
--- 설정
--- ========================================
-local CONFIG = {
-    ToggleKey = Enum.KeyCode.V,        -- 활성화/비활성화 토글 키
-    SwitchInterval = 0.2,               -- 다음 플레이어로 전환 주기 (초)
-    OffsetDistance = 5,                 -- 대상 뒤로 떨어질 거리 (studs, 약 0.5칸)
-    OffsetHeight = 0                    -- 높이 오프셋 (필요시 조정)
-}
+local LocalPlayer = Players.LocalPlayer
+local PlayerList = {}
+local CurrentTargetIndex = 1
+local IsCycling = false
+local OffsetDistance = 5 -- 타겟 뒤쪽으로 떨어질 거리
 
--- ========================================
--- 변수
--- ========================================
-local player = Players.LocalPlayer
-local isLooping = false
-local currentTargetIndex = 1
-local lastSwitchTime = tick()
-
--- ========================================
--- 유틸리티 함수
--- ========================================
-
--- 플레이어의 캐릭터와 HumanoidRootPart를 안전하게 가져오기
-local function getCharacterParts()
-    local character = player.Character
-    if not character then return nil, nil end
-    
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    return character, humanoidRootPart
+-- 플레이어 목록 업데이트 함수
+local function UpdatePlayerList()
+    PlayerList = {}
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            table.insert(PlayerList, player)
+        end
+    end
 end
 
--- 텔레포트 가능한 타겟 목록 생성 (자신 제외)
-local function getValidTargets()
-    local targets = {}
-    local playerList = Players:GetPlayers()
-    
-    for _, targetPlayer in ipairs(playerList) do
-        if targetPlayer ~= player then
-            local targetChar = targetPlayer.Character
-            if targetChar then
-                local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
-                if targetRoot then
-                    table.insert(targets, {
-                        Player = targetPlayer,
-                        RootPart = targetRoot
-                    })
-                end
+-- 텔레포트 실행 함수
+local function TeleportToTarget()
+    if #PlayerList == 0 then
+        return
+    end
+
+    -- 인덱스 범위 확인
+    if CurrentTargetIndex > #PlayerList then
+        CurrentTargetIndex = 1
+    elseif CurrentTargetIndex < 1 then
+        CurrentTargetIndex = #PlayerList
+    end
+
+    local TargetPlayer = PlayerList[CurrentTargetIndex]
+
+    if TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local TargetHRP = TargetPlayer.Character.HumanoidRootPart
+        local MyHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+        if MyHRP then
+            -- 타겟의 바라보는 방향의 반대쪽 계산
+            local TargetLookVector = TargetHRP.CFrame.LookVector
+            local NewPosition = TargetHRP.CFrame.Position - (TargetLookVector * OffsetDistance)
+            
+            -- 텔레포트 실행
+            MyHRP.CFrame = CFrame.new(NewPosition, TargetHRP.Position)
+        end
+    end
+end
+
+-- 키 입력 이벤트 처리 (V키)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then
+        return
+    end
+
+    if input.KeyCode == Enum.KeyCode.V then
+        IsCycling = not IsCycling
+        
+        if IsCycling then
+            UpdatePlayerList()
+            if #PlayerList > 0 then
+                TeleportToTarget()
             end
         end
     end
-    
-    return targets
-end
+end)
 
--- 타겟의 뒤쪽 위치 계산 (타겟이 바라보는 반대 방향)
-local function calculateBehindPosition(targetCFrame, distance, heightOffset)
-    -- LookVector의 반대 방향으로 거리만큼 이동
-    local behindOffset = -targetCFrame.LookVector * distance
-    local heightOffsetVector = Vector3.new(0, heightOffset, 0)
-    
-    -- 타겟의 회전은 유지하되 위치만 뒤로 이동
-    return targetCFrame + behindOffset + heightOffsetVector
-end
-
--- ========================================
--- 키 입력 처리
--- ========================================
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    -- UI 입력 중이면 무시
-    if gameProcessed then return end
-    
-    if input.KeyCode == CONFIG.ToggleKey then
-        isLooping = not isLooping
-        
-        -- 상태 메시지 출력
-        if isLooping then
-            print("✅ [순환 텔레포트] 활성화됨")
-            currentTargetIndex = 1  -- 인덱스 초기화
-        else
-            print("❌ [순환 텔레포트] 비활성화됨")
+-- 루프 처리 (필요 시 업데이트)
+RunService.Heartbeat:Connect(function()
+    if IsCycling then
+        -- 플레이어가 나갈 경우를 대비해 주기적으로 업데이트
+        if tick() % 1 < 0.05 then
+            UpdatePlayerList()
         end
     end
 end)
-
--- ========================================
--- 메인 루프 (Heartbeat - 매 프레임마다 실행)
--- ========================================
-RunService.Heartbeat:Connect(function()
-    if not isLooping then return end
-    
-    -- 시간 체크 (설정된 간격마다만 실행)
-    local currentTime = tick()
-    if currentTime - lastSwitchTime < CONFIG.SwitchInterval then
-        return
-    end
-    
-    -- 캐릭터 유효성 검사
-    local character, humanoidRootPart = getCharacterParts()
-    if not humanoidRootPart then
-        warn("⚠️ HumanoidRootPart를 찾을 수 없습니다.")
-        return
-    end
-    
-    -- 텔레포트 가능한 타겟 목록 가져오기
-    local targets = getValidTargets()
-    
-    if #targets == 0 then
-        warn("⚠️ 텔레포트 가능한 플레이어가 없습니다.")
-        return
-    end
-    
-    -- 인덱스 순환 처리
-    if currentTargetIndex > #targets then
-        currentTargetIndex = 1
-    end
-    
-    -- 현재 타겟 선택
-    local targetData = targets[currentTargetIndex]
-    local targetRootPart = targetData.RootPart
-    
-    -- 타겟 뒤쪽 위치 계산
-    local behindPosition = calculateBehindPosition(
-        targetRootPart.CFrame,
-        CONFIG.OffsetDistance,
-        CONFIG.OffsetHeight
-    )
-    
-    -- 텔레포트 실행 (로컬만 적용됨, FE 게임에서는 서버 동기화 안 됨)
-    humanoidRootPart.CFrame = behindPosition
-    
-    -- 디버그 출력 (옵션)
-    -- print(string.format("📍 [%d/%d] %s 뒤로 텔레포트", currentTargetIndex, #targets, targetData.Player.Name))
-    
-    -- 다음 타겟으로 이동
-    currentTargetIndex = currentTargetIndex + 1
-    lastSwitchTime = currentTime
-end)
-
--- ========================================
--- 캐릭터 리스폰 처리
--- ========================================
-player.CharacterAdded:Connect(function(newCharacter)
-    -- 캐릭터가 새로 생성될 때마다 참조 갱신
-    character = newCharacter
-    humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
-    
-    print("🔄 캐릭터가 리스폰되었습니다. 스크립트가 계속 작동합니다.")
-end)
-
-print("✨ 순환 텔레포트 스크립트 로드 완료")
-print("📌 V 키를 눌러 활성화/비활성화할 수 있습니다.")

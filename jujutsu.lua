@@ -1,4 +1,8 @@
 local player = game.Players.LocalPlayer
+local uis = game:GetService("UserInputService")
+local rs = game:GetService("RunService")
+local lighting = game:GetService("Lighting")
+
 local gui = Instance.new("ScreenGui", player.PlayerGui)
 gui.Name = "PositionMarkerGui"
 gui.ResetOnSpawn = false
@@ -7,30 +11,116 @@ gui.ResetOnSpawn = false
 local baseHeight = 350
 local rowHeight = 45
 
--- 메인 창 크기 및 위치 설정
+--------------------------------------------------
+-- [메인 창 생성]
+--------------------------------------------------
 local frame = Instance.new("Frame", gui)
 frame.Size = UDim2.new(0, 420, 0, baseHeight)
 frame.Position = UDim2.new(0.5, -210, 0.5, -175)
 frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 frame.BorderSizePixel = 0
+frame.Visible = true -- 초기 상태
 
--- 창 드래그 기능
-local dragging, dragInput, dragStart, startPos
+--------------------------------------------------
+-- [모바일 친화적 드래그 가능 구슬 버튼]
+--------------------------------------------------
+local toggleBubble = Instance.new("TextButton", gui)
+toggleBubble.Size = UDim2.new(0, 50, 0, 50)
+toggleBubble.Position = UDim2.new(0, 20, 0.5, -25)
+toggleBubble.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+toggleBubble.Text = "닫기"
+toggleBubble.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBubble.TextSize = 14
+toggleBubble.Font = Enum.Font.SourceSansBold
+toggleBubble.Active = true
+
+-- 동그랗게 만들기 (UICorner)
+local corner = Instance.new("UICorner", toggleBubble)
+corner.CornerRadius = UDim.new(1, 0)
+
+-- 구슬 드래그 지원 (터치 & 마우스 공용)
+local bubbleDragging = false
+local bubbleDragStart, startBubblePos
+
+local function updateInput(input)
+	local delta = input.Position - bubbleDragStart
+	toggleBubble.Position = UDim2.new(
+		startBubblePos.X.Scale, startBubblePos.X.Offset + delta.X,
+		startBubblePos.Y.Scale, startBubblePos.Y.Offset + delta.Y
+	)
+end
+
+toggleBubble.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		bubbleDragging = true
+		bubbleDragStart = input.Position
+		startBubblePos = toggleBubble.Position
+		
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				bubbleDragging = false
+			end
+		end)
+	end
+end)
+
+uis.InputChanged:Connect(function(input)
+	if bubbleDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		updateInput(input)
+	end
+end)
+
+-- 구슬 클릭 시 창 토글 (드래그 시 클릭 미작동)
+local dragDistance = 0
+toggleBubble.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragDistance = 0
+	end
+end)
+
+toggleBubble.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragDistance = dragDistance + 1
+	end
+end)
+
+toggleBubble.MouseButton1Click:Connect(function()
+	-- 약간의 드래그는 무시하고 클릭으로 처리
+	if dragDistance < 5 then
+		frame.Visible = not frame.Visible
+		if frame.Visible then
+			toggleBubble.Text = "닫기"
+			toggleBubble.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+		else
+			toggleBubble.Text = "열기"
+			toggleBubble.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+		end
+	end
+end)
+
+--------------------------------------------------
+-- [메인 창 드래그 기능 (모바일/PC 지원)]
+--------------------------------------------------
+local dragging, dragStart, startPos
 frame.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		dragging = true
 		dragStart = input.Position
 		startPos = frame.Position
 	end
 end)
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+
+uis.InputChanged:Connect(function(input)
+	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 		local delta = input.Position - dragStart
 		frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 	end
 end)
-game:GetService("UserInputService").InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+
+uis.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+		dragging = false 
+	end
 end)
 
 
@@ -91,16 +181,15 @@ speedBox.ClearTextOnFocus = false
 
 
 --------------------------------------------------
--- 동적 좌표 관리 시스템 (텔레포트, 저장, 이름, 삭제 한 줄 세트)
+-- 동적 좌표 관리 시스템
 --------------------------------------------------
 
 local coordinates = {} 
-local startY = 145 -- 첫 번째 좌표 세트가 시작되는 Y 위치
+local startY = 145
 
 local function createCoordinateRow(index)
 	local currentY = startY + ((index - 1) * rowHeight)
 	
-	-- 1. 왼쪽: 수동 텔레포트 버튼
 	local tpBtn = Instance.new("TextButton", frame)
 	tpBtn.Size = UDim2.new(0, 120, 0, 35)
 	tpBtn.Position = UDim2.new(0, 10, 0, currentY)
@@ -110,7 +199,6 @@ local function createCoordinateRow(index)
 	tpBtn.TextSize = 13
 	tpBtn.Font = Enum.Font.SourceSansBold
 	
-	-- 2. 중앙: 좌표 저장 버튼
 	local saveBtn = Instance.new("TextButton", frame)
 	saveBtn.Size = UDim2.new(0, 130, 0, 35)
 	saveBtn.Position = UDim2.new(0, 140, 0, currentY)
@@ -120,7 +208,6 @@ local function createCoordinateRow(index)
 	saveBtn.TextSize = 13
 	saveBtn.Font = Enum.Font.SourceSansBold
 	
-	-- 3. 오른쪽: 이름 입력창
 	local nameBox = Instance.new("TextBox", frame)
 	nameBox.Size = UDim2.new(0, 60, 0, 35)
 	nameBox.Position = UDim2.new(0, 280, 0, currentY)
@@ -131,7 +218,6 @@ local function createCoordinateRow(index)
 	nameBox.Font = Enum.Font.SourceSansBold
 	nameBox.ClearTextOnFocus = false
 	
-	-- 4. 오른쪽 끝: 개별 삭제 버튼
 	local deleteBtn = Instance.new("TextButton", frame)
 	deleteBtn.Size = UDim2.new(0, 55, 0, 35)
 	deleteBtn.Position = UDim2.new(0, 345, 0, currentY)
@@ -150,7 +236,6 @@ local function createCoordinateRow(index)
 		deleteBtn = deleteBtn
 	}
 	
-	-- 좌표 저장 이벤트
 	saveBtn.MouseButton1Click:Connect(function()
 		local char = player.Character
 		if not char or not char:FindFirstChild("HumanoidRootPart") then return end
@@ -172,7 +257,6 @@ local function createCoordinateRow(index)
 		tpBtn.Text = customName
 	end)
 	
-	-- 텔레포트 이벤트
 	tpBtn.MouseButton1Click:Connect(function()
 		if not data.cframe then return end
 		local char = player.Character
@@ -181,7 +265,6 @@ local function createCoordinateRow(index)
 		end
 	end)
 	
-	-- 개별 삭제 이벤트
 	deleteBtn.MouseButton1Click:Connect(function()
 		data.cframe = nil
 		if data.marker then
@@ -209,7 +292,7 @@ addBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 addBtn.TextSize = 14
 addBtn.Font = Enum.Font.SourceSansBold
 
--- 모든 좌표 삭제 버튼 생성 (플러스 버튼 아래에 배치)
+-- 모든 좌표 삭제 버튼 생성
 local deleteAllBtn = Instance.new("TextButton", frame)
 deleteAllBtn.Size = UDim2.new(0, 120, 0, 35)
 deleteAllBtn.Position = UDim2.new(0, 140, 0, nextY + 45)
@@ -219,7 +302,6 @@ deleteAllBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 deleteAllBtn.TextSize = 13
 deleteAllBtn.Font = Enum.Font.SourceSansBold
 
--- 메인 창 크기 업데이트 함수
 local function updateFrameSize()
 	local totalRows = #coordinates
 	local newHeight = startY + (totalRows * rowHeight) + 95
@@ -227,16 +309,13 @@ local function updateFrameSize()
 end
 updateFrameSize()
 
--- 플러스 버튼 클릭 시 새로운 좌표 세트 추가
 addBtn.MouseButton1Click:Connect(function()
 	local newIndex = #coordinates + 1
 	local finalY = createCoordinateRow(newIndex)
 	
-	-- 플러스 버튼 및 전체 삭제 버튼 위치 아래로 재배치
 	addBtn.Position = UDim2.new(0, 140, 0, finalY + 5)
 	deleteAllBtn.Position = UDim2.new(0, 140, 0, finalY + 45)
 	
-	-- 메인 창 크기 늘리기
 	updateFrameSize()
 end)
 
@@ -272,7 +351,6 @@ end)
 
 -- 밤에 밝게 빛나기 기능 (FullBright)
 local brightEnabled = false
-local lighting = game:GetService("Lighting")
 local originalClockTime = lighting.ClockTime
 local originalBrightness = lighting.Brightness
 local originalOutdoorAmbient = lighting.OutdoorAmbient
@@ -296,8 +374,6 @@ end)
 
 -- 플라이 기능
 local flyEnabled = false
-local uis = game:GetService("UserInputService")
-local rs = game:GetService("RunService")
 local bg, bv
 
 flyBtn.MouseButton1Click:Connect(function()
@@ -354,7 +430,7 @@ flyBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
-player.CharacterAdded:Connect(function(char)
+player.CharacterAdded:Connect(function()
 	flyEnabled = false
 	flyBtn.Text = "플라이: OFF"
 	flyBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)

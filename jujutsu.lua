@@ -3,75 +3,71 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
-local PlayerList = {}
-local CurrentTargetIndex = 1
-local IsCycling = false
-local OffsetDistance = 5 -- 타겟 뒤쪽으로 떨어질 거리
+local TargetMode = false
+local TargetKey = Enum.KeyCode.V
+local TargetDistance = 0.1 -- 타겟과의 거리
 
--- 플레이어 목록 업데이트 함수
-local function UpdatePlayerList()
-    PlayerList = {}
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            table.insert(PlayerList, player)
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 200, 0, 50)
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -50)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.Active = true
+
+local currentTarget = nil
+
+-- 타겟 변경 함수
+local function GetNextPlayer()
+    local players = Players:GetPlayers()
+    local validPlayers = {}
+    
+    for _, p in pairs(players) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            table.insert(validPlayers, p)
         end
     end
-end
-
--- 텔레포트 실행 함수
-local function TeleportToTarget()
-    if #PlayerList == 0 then
-        return
-    end
-
-    -- 인덱스 범위 확인
-    if CurrentTargetIndex > #PlayerList then
-        CurrentTargetIndex = 1
-    elseif CurrentTargetIndex < 1 then
-        CurrentTargetIndex = #PlayerList
-    end
-
-    local TargetPlayer = PlayerList[CurrentTargetIndex]
-
-    if TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local TargetHRP = TargetPlayer.Character.HumanoidRootPart
-        local MyHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-
-        if MyHRP then
-            -- 타겟의 바라보는 방향의 반대쪽 계산
-            local TargetLookVector = TargetHRP.CFrame.LookVector
-            local NewPosition = TargetHRP.CFrame.Position - (TargetLookVector * OffsetDistance)
-            
-            -- 텔레포트 실행
-            MyHRP.CFrame = CFrame.new(NewPosition, TargetHRP.Position)
-        end
-    end
-end
-
--- 키 입력 이벤트 처리 (V키)
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then
-        return
-    end
-
-    if input.KeyCode == Enum.KeyCode.V then
-        IsCycling = not IsCycling
-        
-        if IsCycling then
-            UpdatePlayerList()
-            if #PlayerList > 0 then
-                TeleportToTarget()
+    
+    if #validPlayers == 0 then return nil end
+    
+    -- 현재 타겟 다음 사람 찾기
+    local currentIndex = 1
+    if currentTarget then
+        for i, p in pairs(validPlayers) do
+            if p == currentTarget then
+                currentIndex = i + 1
+                break
             end
+        end
+    end
+    
+    if currentIndex > #validPlayers then currentIndex = 1 end
+    return validPlayers[currentIndex]
+end
+
+-- V키로 토글 및 타겟 변경
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == TargetKey then
+        TargetMode = not TargetMode
+        if TargetMode then
+            currentTarget = GetNextPlayer() -- 켜질 때 타겟 설정
+        else
+            currentTarget = nil -- 꺼지면 타겟 해제
         end
     end
 end)
 
--- 루프 처리 (필요 시 업데이트)
+-- 루프 텔레포트 로직
 RunService.Heartbeat:Connect(function()
-    if IsCycling then
-        -- 플레이어가 나갈 경우를 대비해 주기적으로 업데이트
-        if tick() % 1 < 0.05 then
-            UpdatePlayerList()
+    if TargetMode and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        -- 타겟이 유효한지 확인 (죽었거나 나갔는지)
+        if not currentTarget or not currentTarget.Character or not currentTarget.Character:FindFirstChild("HumanoidRootPart") then
+            currentTarget = GetNextPlayer()
+        end
+        
+        -- 루프 텔레포트 실행
+        if currentTarget and currentTarget.Character:FindFirstChild("HumanoidRootPart") then
+            local targetPos = currentTarget.Character.HumanoidRootPart.CFrame
+            LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(targetPos.Position + (targetPos.LookVector * -TargetDistance), targetPos.Position)
         end
     end
 end)

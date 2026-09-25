@@ -5,18 +5,13 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local TargetMode = false
 local TargetKey = Enum.KeyCode.V
-local TargetDistance = 0.1 -- 타겟과의 거리
+local TeleportOffset = 0.3 -- 상대방 뒤 0.3칸
+local CycleInterval = 0.2 -- 0.2초마다 변경
 
-local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
-local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 200, 0, 50)
-MainFrame.Position = UDim2.new(0.5, -100, 0.5, -50)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-MainFrame.Active = true
+local lastCycleTime = 0
+local currentIndex = 1
 
-local currentTarget = nil
-
--- 타겟 변경 함수
+-- 순환 타겟팅 함수
 local function GetNextPlayer()
     local players = Players:GetPlayers()
     local validPlayers = {}
@@ -29,45 +24,40 @@ local function GetNextPlayer()
     
     if #validPlayers == 0 then return nil end
     
-    -- 현재 타겟 다음 사람 찾기
-    local currentIndex = 1
-    if currentTarget then
-        for i, p in pairs(validPlayers) do
-            if p == currentTarget then
-                currentIndex = i + 1
-                break
-            end
-        end
-    end
-    
-    if currentIndex > #validPlayers then currentIndex = 1 end
+    -- 인덱스 순환
+    currentIndex = (currentIndex % #validPlayers) + 1
     return validPlayers[currentIndex]
 end
 
--- V키로 토글 및 타겟 변경
+-- V키로 토글
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and input.KeyCode == TargetKey then
         TargetMode = not TargetMode
-        if TargetMode then
-            currentTarget = GetNextPlayer() -- 켜질 때 타겟 설정
-        else
-            currentTarget = nil -- 꺼지면 타겟 해제
-        end
+        currentIndex = 1 -- 켤 때마다 처음부터 다시 시작
     end
 end)
 
--- 루프 텔레포트 로직
+-- 고속 루프 텔레포트 (0.2초마다 타겟 변경)
 RunService.Heartbeat:Connect(function()
-    if TargetMode and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        -- 타겟이 유효한지 확인 (죽었거나 나갔는지)
-        if not currentTarget or not currentTarget.Character or not currentTarget.Character:FindFirstChild("HumanoidRootPart") then
-            currentTarget = GetNextPlayer()
-        end
+    if TargetMode then
+        local currentTime = tick()
         
-        -- 루프 텔레포트 실행
-        if currentTarget and currentTarget.Character:FindFirstChild("HumanoidRootPart") then
-            local targetPos = currentTarget.Character.HumanoidRootPart.CFrame
-            LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(targetPos.Position + (targetPos.LookVector * -TargetDistance), targetPos.Position)
+        -- 로컬 캐릭터 체크
+        if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+        
+        -- 0.2초마다 타겟 변경 실행
+        if (currentTime - lastCycleTime) >= CycleInterval then
+            local targetPlayer = GetNextPlayer()
+            
+            if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local targetPart = targetPlayer.Character.HumanoidRootPart
+                local targetCFrame = targetPart.CFrame
+                
+                -- 상대방 뒤 0.3칸(TeleportOffset)으로 텔레포트
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(targetCFrame.Position + (targetCFrame.LookVector * -TeleportOffset), targetCFrame.Position)
+            end
+            
+            lastCycleTime = currentTime
         end
     end
 end)

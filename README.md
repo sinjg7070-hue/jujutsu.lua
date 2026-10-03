@@ -91,7 +91,7 @@ previewLabel.TextYAlignment = Enum.TextYAlignment.Center
 previewLabel.TextWrapped = true
 previewLabel.Parent = previewFrame
 
--- 한글 오토마타 조합 엔진 (없 전용 외 3개 자음 조합 원천 차단)
+-- 한글 오토마타 조합 엔진
 local CHO = {"ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"}
 local JUNG = {"ㅏ", "ㅐ", "ㅑ", "ㅒ", "ㅓ", "ㅔ", "ㅕ", "ㅖ", "ㅗ", "ㅘ", "ㅙ", "ㅚ", "ㅛ", "ㅜ", "ㅝ", "ㅞ", "ㅟ", "ㅠ", "ㅡ", "ㅢ", "ㅣ"}
 local JONG = {"", "ㄱ", "ㄲ", "ㄳ", "ㄴ", "ㄵ", "ㄶ", "ㄷ", "ㄹ", "ㄺ", "ㄻ", "ㄼ", "ㄽ", "ㄾ", "ㄿ", "ㅀ", "ㅁ", "ㅂ", "ㅄ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"}
@@ -168,15 +168,17 @@ local function translateEngToHangul(str)
 					i = i + 1
 				elseif g > 0 then
 					local combined = false
-					-- 오직 '없'(ㅂ + ㅅ = ㅄ)만 3개 이상 자음 중 겹받침 허용
+					-- '없' (ㅂ+ㅅ = ㅄ) 및 '않' (ㄴ+ㅎ = ㄶ) 등 정상 겹받침 허용
 					if g == 17 and char == "t" then 
-						g = 18; combined = true 
+						g = 18; combined = true -- ㅄ
+					elseif g == 4 and char == "g" then 
+						g = 6; combined = true  -- ㄶ (않)
 					end
 					
 					if combined then
 						i = i + 1
 					else
-						-- '없' 외의 다른 3개 이상 자음 조합 시 무조건 강제 차단 후 분리
+						-- 허용되지 않은 3개 이상 자음 조합은 강제 차단 후 분리
 						flush()
 						if cho_v then
 							c = cho_v

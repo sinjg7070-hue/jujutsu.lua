@@ -1,13 +1,22 @@
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local TextChatService = game:GetService("TextChatService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local StarterGui = game:GetService("StarterGui")
 
 local player = Players.LocalPlayer
 
+-- 기존 커스텀 UI 제거
 pcall(function()
 	if CoreGui:FindFirstChild("KoreanAutoUI") then CoreGui.KoreanAutoUI:Destroy() end
 	if player.PlayerGui:FindFirstChild("KoreanAutoUI") then player.PlayerGui.KoreanAutoUI:Destroy() end
+end)
+
+-- 로블록스 기본 입력창은 숨기고, 대화 내역 창은 유지
+pcall(function()
+	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, true)
+	TextChatService.ChatWindowConfiguration.Enabled = true
+	TextChatService.ChatInputBarConfiguration.Enabled = false
 end)
 
 local screenGui = Instance.new("ScreenGui")
@@ -16,71 +25,32 @@ screenGui.ResetOnSpawn = false
 pcall(function() screenGui.Parent = CoreGui end)
 if not screenGui.Parent then screenGui.Parent = player:WaitForChild("PlayerGui") end
 
+-- 원래 채팅창 위치 (왼쪽 아래)
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 420, 0, 155)
-frame.Position = UDim2.new(0.5, -210, 0.5, -77)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+frame.Size = UDim2.new(0, 320, 0, 40)
+frame.Position = UDim2.new(0, 10, 1, -50)
+frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+frame.BackgroundTransparency = 0.5
 frame.BorderSizePixel = 0
 frame.Active = true
-frame.Draggable = true
+frame.Draggable = false
 frame.Parent = screenGui
 
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 10)
+corner.CornerRadius = UDim.new(0, 8)
 corner.Parent = frame
 
-local titleBar = Instance.new("TextLabel")
-titleBar.Size = UDim2.new(1, -170, 0, 30)
-titleBar.Position = UDim2.new(0, 10, 0, 5)
-titleBar.BackgroundTransparency = 1
-titleBar.Text = "  한글 조합 미리보기 변환기"
-titleBar.TextColor3 = Color3.fromRGB(180, 180, 180)
-titleBar.TextSize = 12
-titleBar.Font = Enum.Font.GothamBold
-titleBar.TextXAlignment = Enum.TextXAlignment.Left
-titleBar.Parent = frame
-
-local sizeInputBox = Instance.new("TextBox")
-sizeInputBox.Size = UDim2.new(0, 75, 0, 26)
-sizeInputBox.Position = UDim2.new(1, -160, 0, 5)
-sizeInputBox.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-sizeInputBox.BorderSizePixel = 0
-sizeInputBox.Text = "2"
-sizeInputBox.PlaceholderText = "크기(1~5)"
-sizeInputBox.TextColor3 = Color3.fromRGB(220, 220, 220)
-sizeInputBox.TextSize = 12
-sizeInputBox.Font = Enum.Font.GothamBold
-sizeInputBox.ClearTextOnFocus = false
-sizeInputBox.Parent = frame
-
-local sizeBoxCorner = Instance.new("UICorner")
-sizeBoxCorner.CornerRadius = UDim.new(0, 6)
-sizeBoxCorner.Parent = sizeInputBox
-
-local sendButton = Instance.new("TextButton")
-sendButton.Size = UDim2.new(0, 70, 0, 26)
-sendButton.Position = UDim2.new(1, -78, 0, 5)
-sendButton.BackgroundColor3 = Color3.fromRGB(0, 160, 255)
-sendButton.Text = "보내기"
-sendButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-sendButton.TextSize = 12
-sendButton.Font = Enum.Font.GothamBold
-sendButton.Parent = frame
-
-local sendCorner = Instance.new("UICorner")
-sendCorner.CornerRadius = UDim.new(0, 6)
-sendCorner.Parent = sendButton
-
+-- 영타 입력창
 local textBox = Instance.new("TextBox")
-textBox.Size = UDim2.new(1, -20, 0, 45)
-textBox.Position = UDim2.new(0, 10, 0, 38)
-textBox.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+textBox.Size = UDim2.new(1, -12, 1, 0)
+textBox.Position = UDim2.new(0, 6, 0, 0)
+textBox.BackgroundTransparency = 1
 textBox.BorderSizePixel = 0
 textBox.Text = ""
-textBox.PlaceholderText = ""
+textBox.PlaceholderText = "여기에 입력 후 엔터"
 textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-textBox.PlaceholderColor3 = Color3.fromRGB(120, 120, 120)
-textBox.TextSize = 15
+textBox.PlaceholderColor3 = Color3.fromRGB(160, 160, 160)
+textBox.TextSize = 14
 textBox.Font = Enum.Font.GothamMedium
 textBox.ClearTextOnFocus = false
 textBox.MultiLine = false
@@ -89,14 +59,28 @@ textBox.TextXAlignment = Enum.TextXAlignment.Left
 textBox.TextYAlignment = Enum.TextYAlignment.Center
 textBox.Parent = frame
 
-local boxCorner = Instance.new("UICorner")
-boxCorner.CornerRadius = UDim.new(0, 6)
-boxCorner.Parent = textBox
+-- 원래 채팅창 오른쪽 부근에 위치한 선명한 검은색 번역 미리보기 UI
+local previewFrame = Instance.new("Frame")
+previewFrame.Size = UDim2.new(0, 320, 0, 40)
+previewFrame.Position = UDim2.new(0, 335, 1, -50)
+previewFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+previewFrame.BackgroundTransparency = 0.2
+previewFrame.BorderSizePixel = 0
+previewFrame.Parent = screenGui
+
+local previewCorner = Instance.new("UICorner")
+previewCorner.CornerRadius = UDim.new(0, 8)
+previewCorner.Parent = previewFrame
+
+local previewStroke = Instance.new("UIStroke")
+previewStroke.Color = Color3.fromRGB(0, 255, 128)
+previewStroke.Thickness = 1.5
+previewStroke.Parent = previewFrame
 
 local previewLabel = Instance.new("TextLabel")
-previewLabel.Size = UDim2.new(1, -20, 0, 45)
-previewLabel.Position = UDim2.new(0, 10, 0, 93)
-previewLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+previewLabel.Size = UDim2.new(1, -16, 1, 0)
+previewLabel.Position = UDim2.new(0, 8, 0, 0)
+previewLabel.BackgroundTransparency = 1
 previewLabel.BorderSizePixel = 0
 previewLabel.Text = ""
 previewLabel.TextColor3 = Color3.fromRGB(0, 255, 128)
@@ -105,12 +89,9 @@ previewLabel.Font = Enum.Font.GothamBold
 previewLabel.TextXAlignment = Enum.TextXAlignment.Left
 previewLabel.TextYAlignment = Enum.TextYAlignment.Center
 previewLabel.TextWrapped = true
-previewLabel.Parent = frame
+previewLabel.Parent = previewFrame
 
-local prevCorner = Instance.new("UICorner")
-prevCorner.CornerRadius = UDim.new(0, 6)
-prevCorner.Parent = previewLabel
-
+-- 한글 오토마타 조합 엔진 (없 전용 외 3개 자음 조합 원천 차단)
 local CHO = {"ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"}
 local JUNG = {"ㅏ", "ㅐ", "ㅑ", "ㅒ", "ㅓ", "ㅔ", "ㅕ", "ㅖ", "ㅗ", "ㅘ", "ㅙ", "ㅚ", "ㅛ", "ㅜ", "ㅝ", "ㅞ", "ㅟ", "ㅠ", "ㅡ", "ㅢ", "ㅣ"}
 local JONG = {"", "ㄱ", "ㄲ", "ㄳ", "ㄴ", "ㄵ", "ㄶ", "ㄷ", "ㄹ", "ㄺ", "ㄻ", "ㄼ", "ㄽ", "ㄾ", "ㄿ", "ㅀ", "ㅁ", "ㅂ", "ㅄ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"}
@@ -185,6 +166,25 @@ local function translateEngToHangul(str)
 				if JUNG_COMP[combinedJungKey] and g == 0 then
 					j = JUNG_COMP[combinedJungKey]
 					i = i + 1
+				elseif g > 0 then
+					local combined = false
+					-- 오직 '없'(ㅂ + ㅅ = ㅄ)만 3개 이상 자음 중 겹받침 허용
+					if g == 17 and char == "t" then 
+						g = 18; combined = true 
+					end
+					
+					if combined then
+						i = i + 1
+					else
+						-- '없' 외의 다른 3개 이상 자음 조합 시 무조건 강제 차단 후 분리
+						flush()
+						if cho_v then
+							c = cho_v
+						elseif jong_v then
+							c = jong_v
+						end
+						i = i + 1
+					end
 				elseif jong_v and g == 0 and not next_jung_v then
 					g = jong_v
 					i = i + 1
@@ -212,36 +212,12 @@ local function translateEngToHangul(str)
 	return table.concat(result)
 end
 
-sizeInputBox:GetPropertyChangedSignal("Text"):Connect(function()
-	local num = tonumber(sizeInputBox.Text)
-	if not num then return end
-	if num < 1 then num = 1 end
-	if num > 5 then num = 5 end
-	
-	local w = 350 + (num * 75)
-	local boxH = 30 + (num * 12)
-	local prevH = 30 + (num * 12)
-	local prevY = 38 + boxH + 8
-	local h = prevY + prevH + 12
-	
-	local textSz = 11 + (num * 3)
-	local prevSz = 10 + (num * 3)
-	
-	frame.Size = UDim2.new(0, w, 0, h)
-	textBox.Size = UDim2.new(1, -20, 0, boxH)
-	previewLabel.Position = UDim2.new(0, 10, 0, prevY)
-	previewLabel.Size = UDim2.new(1, -20, 0, prevH)
-	
-	textBox.TextSize = textSz
-	previewLabel.TextSize = prevSz
-end)
-
 textBox:GetPropertyChangedSignal("Text"):Connect(function()
 	local rawText = textBox.Text
 	if rawText == "" then
 		previewLabel.Text = ""
 	else
-		previewLabel.Text = "  " .. translateEngToHangul(rawText)
+		previewLabel.Text = translateEngToHangul(rawText)
 	end
 end)
 
@@ -254,31 +230,31 @@ local function sendMessage()
 		textBox.Text = ""
 		previewLabel.Text = ""
 		
-		local sent = false
 		pcall(function()
 			local textChannel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
 			if textChannel then
 				textChannel:SendAsync(convertedMsg)
-				sent = true
 			end
 		end)
-		
-		if not sent then
-			pcall(function()
-				local chatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents", true)
-				if chatEvents and chatEvents:FindFirstChild("SayMessageRequest") then
-					chatEvents.SayMessageRequest:FireServer(convertedMsg, "All")
-					sent = true
-				end
-			end)
-		end
 	end
 end
-
-sendButton.MouseButton1Click:Connect(sendMessage)
 
 textBox.FocusLost:Connect(function(enterPressed)
 	if enterPressed then
 		sendMessage()
+	end
+end)
+
+-- 슬래시(/) 키를 누르면 자동으로 입력창에 포커스가 가도록 설정
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	
+	if input.KeyCode == Enum.KeyCode.Slash then
+		task.defer(function()
+			textBox:CaptureFocus()
+			if textBox.Text == "/" then
+				textBox.Text = ""
+			end
+		end)
 	end
 end)

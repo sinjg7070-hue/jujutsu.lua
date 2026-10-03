@@ -168,7 +168,7 @@ local function translateEngToHangul(str)
 					i = i + 1
 				elseif g > 0 then
 					local combined = false
-					-- '없' (ㅂ+ㅅ = ㅄ) 및 '않' (ㄴ+ㅎ = ㄶ) 등 정상 겹받침 허용
+					-- '없' (ㅂ+ㅅ = ㅄ) 및 '않' (ㄴ받침 's' 상태에서 'g' 입력 시 ㄶ = 6)
 					if g == 17 and char == "t" then 
 						g = 18; combined = true -- ㅄ
 					elseif g == 4 and char == "g" then 
